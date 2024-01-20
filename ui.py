@@ -39,11 +39,14 @@ import sys
 import speech_recognition as sr
 import pyaudio
 import numpy as np
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel
+from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QPixmap, QImage
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from scipy.ndimage import gaussian_filter1d
+import matplotlib.pyplot as plt
+
+# https://www.youtube.com/watch?v=U_vWfzhWINw&list=PLOJ3MJq530fhU8m9pBq7ysQk4KtkdOQZC
 
 
 class MicrophoneStream:
@@ -75,6 +78,7 @@ class MicrophoneCanvas(FigureCanvas):
         self.line.set_ydata(audio_data)
         self.draw()
 
+
 class TextCanvas(QWidget):
     def __init__(self):
         super().__init__()
@@ -87,33 +91,48 @@ class TextCanvas(QWidget):
         self.text_label = QLabel('Recognized Text Will Appear Here')
         layout.addWidget(self.text_label)
 
+        self.text_out = QLabel('Waiting')
+        layout.addWidget(self.text_out)
+
         self.setLayout(layout)
 
     def update_text(self, text):
         self.text_label.setText(f'Recognized: {text}')
 
-class SpeechRecognitionApp(QWidget):
+
+class Main(QWidget):
     def __init__(self):
         super().__init__()
 
         self.recognizer = sr.Recognizer()
 
-        self.microphone_stream = MicrophoneStream()
+        try:
+            self.microphone_stream = MicrophoneStream()
+        except Exception as e:
+            print(e)
 
         self.init_ui()
 
-        self.timer_id = self.startTimer(50)  # Timer interval in milliseconds
+        # self.timer_id = self.startTimer(50)  # Timer interval in milliseconds
 
     def init_ui(self):
-        self.setWindowTitle('Speech Recognition App')
-        self.setGeometry(100, 100, 800, 400)
+        self.setGeometry(100, 100, 300, 400)
 
         layout = QVBoxLayout()
 
-        self.microphone_canvas = MicrophoneCanvas()
-        layout.addWidget(self.microphone_canvas)
-
+        rec_button_widget = QPushButton('Rec Now')
+        open_clip_widget = QPushButton('Open Clip')
+        date_widget = QDateTimeEdit()
+        list_widget = QListWidget()
+        list_widget.addItem('Sentence will be displayed in here')
+        self.microphone_canvas = MicrophoneCanvas()  # instance 생성
         self.text_canvas = TextCanvas()
+
+        layout.addWidget(rec_button_widget)
+        layout.addWidget(open_clip_widget)
+        layout.addWidget(date_widget)
+        layout.addWidget(list_widget)
+        layout.addWidget(self.microphone_canvas)  # ui에 추가
         layout.addWidget(self.text_canvas)
 
         self.setLayout(layout)
@@ -129,8 +148,9 @@ class SpeechRecognitionApp(QWidget):
         except sr.UnknownValueError:
             pass  # Ignore if no speech is detected
 
+
 if __name__ == '__main__':
-    app = QApplication(sys.argv)
-    main_win = SpeechRecognitionApp()
-    main_win.show()
-    sys.exit(app.exec_())
+    app = QApplication(sys.argv)  # create pyqt app
+    main = Main()  # create the instance of Window
+    main.show()
+    sys.exit(app.exec_())  # start the app
