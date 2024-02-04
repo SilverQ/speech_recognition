@@ -22,12 +22,12 @@ def recognize_and_save_speech():
         while True:
             try:
                 audio = recognizer.listen(source, timeout=5)  # 대기 시간을 늘리거나 timeout=None으로 변경
-                sr.energy_threshold = 300
+                sr.energy_threshold = 100
                 sr.pause_threshold = 1
 #                 print("음성 감지 완료")
 #                 text = recognizer.recognize_sphinx(audio)
-                language = "eng"
-#                 language = "ko-KR"
+#                 language = "eng"
+                language = "ko-KR"
                 text = recognizer.recognize_google(audio, language=language)
 #                 print(f"음성 인식 결과: {text}")
                 current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
