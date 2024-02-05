@@ -51,7 +51,7 @@ from scipy.ndimage import gaussian_filter1d
 import matplotlib.pyplot as plt
 
 # https://www.youtube.com/watch?v=U_vWfzhWINw&list=PLOJ3MJq530fhU8m9pBq7ysQk4KtkdOQZC
-
+# pip --trusted-host pypi.org --trusted-host files.pythonhosted.org install -r requirements.txt
 
 class MicrophoneStream:
     def __init__(self):
@@ -227,7 +227,7 @@ class Main(QMainWindow):
         # layout.addWidget(self.text_widget)
         # layout.addWidget(self.microphone_canvas)  # ui에 추가
         # layout.addWidget(self.text_canvas)
-        # layout.addWidget(quit_btn)
+        layout.addWidget(quit_btn)
         # layout.addStretch(1)
 
         # self.recognition_thread = SpeechRecognitionThread(self.mutex)
