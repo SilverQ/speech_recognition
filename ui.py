@@ -51,7 +51,22 @@ from scipy.ndimage import gaussian_filter1d
 import matplotlib.pyplot as plt
 
 # https://www.youtube.com/watch?v=U_vWfzhWINw&list=PLOJ3MJq530fhU8m9pBq7ysQk4KtkdOQZC
+# https://devskim.tistory.com/60
+# . Vosk, whisper를 사용해 인식
+# 환경 구성
+# 모델 다운로드
+# https://alphacephei.com/vosk/models
+# https://alphacephei.com/vosk/models/vosk-model-small-ko-0.22.zip
+# 모델 파일 다운로드 이후에, 프로젝트 폴더 하위에 model 폴더 생성 후 압축해제한다.
 
+# 고민 포인트
+# 1. 스피커를 통해서 나오는 낮은 음량의 음성 인식 불가 해결
+# 2. 음성 인식 정확도 개선을 위해, 재생속도를 느리게 해서 문장 이어붙이기 가능성
+# 3. 여러 API에 인식을 요청하고, 가장 좋은 문장을 선택하는 방안(next sentence pred?)
+# 4. 단어 중간에 잘리지 않도록 duration 설정하기
+# https://wdprogrammer.tistory.com/38
+# 5. 인터넷 연결을 필요로 하지 않는 sphinx를 제외하고 나머지 6개의 메서드는 인터넷 연결이 필요
+#
 
 class MicrophoneStream:
     def __init__(self):
@@ -136,7 +151,9 @@ class SpeechRecognitionThread(QThread):
             while True:
                 try:
                     print(2)
-                    audio = self.recognizer.listen(source, timeout=5)
+                    audio = self.recognizer.listen(source,
+                                                   timeout=10,
+                                                   phrase_time_limit=10)
                     # language = "ko-KR"
                     # text = self.recognizer.recognize_google(audio, language=language)
                     text_kor = self.reg_lang(audio, 'ko-kr')
@@ -144,13 +161,15 @@ class SpeechRecognitionThread(QThread):
                     print('인식 중입니다.')
                     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+                    self.mutex.lock()
                     if len(text_kor) > 0:
                         print(f"[{current_time}] {text_kor}")
-                        self.mutex.lock()
+                        # self.recognition_complete.emit(f"[{current_time}] {text_kor}")
                         # self.recognition_complete.emit(f"[{current_time}] {text}")
-                        self.recognition_complete.emit(f"[{current_time}] {text_kor}")
-                        # self.recognition_complete.emit(f"[{current_time}] {text_eng}")
-                        self.mutex.unlock()
+                    if len(text_eng) > 0:
+                        print(f"[{current_time}] {text_eng}")
+                        self.recognition_complete.emit(f"[{current_time}] {text_eng}")
+                    self.mutex.unlock()
                 except sr.UnknownValueError:
                     print("음성을 감지하지 못했습니다.")
                 except sr.RequestError as e:
@@ -161,7 +180,7 @@ class SpeechRecognitionThread(QThread):
                 except Exception as e:
                     print(e)
                     pass
-                time.sleep(5)
+                # time.sleep(5)
 
 
 class Main(QMainWindow):
@@ -175,9 +194,23 @@ class Main(QMainWindow):
         # self.timer_id = self.startTimer(50)  # Timer interval in milliseconds
 
     def init_ui(self):
-        central_widget = QWidget(self)
-        self.setCentralWidget(central_widget)
+        self.setGeometry(100, 100, 1000, 700)  # x, y, w, height
+        self.setWindowTitle('Kipro 음성인식')
 
+        # 메뉴바
+        menubar = self.menuBar()
+        # menubar.setNativeMenuBar(False)
+        filemenu = menubar.addMenu('File')
+        filemenu.addAction('New')
+        # filemenu.addAction('Quit')
+
+        # 툴바
+        toolbar = QToolBar()
+        self.addToolBar(toolbar)
+
+        # central_widget = QWidget(self)
+        # self.setCentralWidget(central_widget)
+        # layout = QVBoxLayout(central_widget)
         exitAction = QAction(QIcon('icons/exit.png'), 'Exit', self)
         exitAction.setShortcut('Ctrl+Q')
         exitAction.setStatusTip('Exit application')
@@ -188,22 +221,27 @@ class Main(QMainWindow):
         RecAction.setStatusTip('Start Record')
         RecAction.triggered.connect(self.start_recognition)
 
-        # self.statusBar()
-        menubar = self.menuBar()
-        menubar.setNativeMenuBar(False)
-        filemenu = menubar.addMenu('&File')
-        filemenu.addAction(exitAction)
+        # filemenu.addAction(RecAction)
+        # filemenu.addAction(exitAction)
 
-        self.toolbar = self.addToolBar('Rec')
-        self.toolbar.addAction(RecAction)
-        self.toolbar = self.addToolBar('Exit')
-        self.toolbar.addAction(exitAction)
+        toolbar.addAction(RecAction)
+        toolbar.addAction(exitAction)
 
-        self.setWindowTitle('Kipro 음성인식')
-        self.setWindowIcon(QIcon('icons/rec.png'))
+        self.statusBar()
 
-        layout = QVBoxLayout(central_widget)
-        # self.setLayout(layout)
+        vbox_layout = QVBoxLayout()  # main
+        hbox_layout = QHBoxLayout()  # 음원 선택, 녹음
+        vbox_layout1 = QVBoxLayout()  # 음원 선택
+
+        source_label = QLabel('Select Speech Source:')
+        vbox_layout1.addWidget(source_label)
+
+        source_combo_box = QComboBox()
+        source_combo_box.addItem('Microphone')
+        source_combo_box.addItem('Aux Input')
+        source_combo_box.addItem('Vedio File')
+        source_combo_box.addItem('Streaming')
+        vbox_layout1.addWidget(source_combo_box)
 
         rec_button = QPushButton('Rec Now', self)
         rec_button.clicked.connect(self.start_recognition)
@@ -211,18 +249,14 @@ class Main(QMainWindow):
         # date_widget = QDateTimeEdit()
         self.list_widget = QListWidget(self)
         # self.text_widget = QTextEdit(self)
-        # self.list_widget.addItem('Sentence will be displayed in here')
         # self.microphone_canvas = MicrophoneCanvas()  # instance 생성
         # self.text_canvas = TextCanvas()
 
-        quit_btn = QPushButton('Quit', self)
-        quit_btn.clicked.connect(QCoreApplication.instance().quit)
-
-        layout.addWidget(rec_button)
+        # quit_btn = QPushButton('Quit', self)
+        # quit_btn.clicked.connect(QCoreApplication.instance().quit)
         # layout.addStretch(1)
         # layout.addWidget(open_clip_widget)
         # layout.addWidget(date_widget)
-        layout.addWidget(self.list_widget)
         # layout.addStretch(1)
         # layout.addWidget(self.text_widget)
         # layout.addWidget(self.microphone_canvas)  # ui에 추가
@@ -230,22 +264,27 @@ class Main(QMainWindow):
         # layout.addWidget(quit_btn)
         # layout.addStretch(1)
 
-        # self.recognition_thread = SpeechRecognitionThread(self.mutex)
-        # self.recognition_thread.recognition_complete.connect(self.update_list_widget)
-        #
         # # QTimer to trigger recognition every 5 seconds
         # self.timer = QTimer(self)
         # self.timer.timeout.connect(self.start_recognition)
         # self.timer.start(5000)  # Set the interval to 5000 milliseconds (5 seconds)
 
-        self.statusBar().showMessage('Ready')
+        main_widget = QWidget()
+        main_widget.setLayout(vbox_layout)
+        hbox_layout.addLayout(vbox_layout1)
+        hbox_layout.addWidget(rec_button)
 
-        self.setGeometry(1500, 100, 500, 700)  # x, y, w, height
+        vbox_layout.addLayout(hbox_layout)
+        vbox_layout.addWidget(self.list_widget)
+
+        self.setCentralWidget(main_widget)
+        self.setWindowIcon(QIcon('icons/rec.png'))
+        self.statusBar().showMessage('Ready')
 
     def init_microphone(self):
         self.recognizer = sr.Recognizer()
         self.microphone = sr.Microphone()
-        sr.energy_threshold = 100
+        sr.energy_threshold = 50
         sr.pause_threshold = 1
         print('Recognizer 객체 생성.')
         try:
@@ -269,7 +308,6 @@ class Main(QMainWindow):
         self.recognition_thread = SpeechRecognitionThread(self.recognizer, self.microphone)
         self.recognition_thread.recognition_complete.connect(self.update_list_widget)
         self.recognition_thread.start()
-        # print('start_recognition complete')
 
     def update_list_widget(self, text):
         # self.mutex.lock()
